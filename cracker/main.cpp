@@ -9,14 +9,14 @@ using namespace std;
 int main(int argc, char *argv[]){
     QCoreApplication a(argc, argv);
 
-    QCoreApplication::setApplicationName("generic-cracker");
-    QCoreApplication::setApplicationVersion("0.1");
+    QCoreApplication::setApplicationName("mdxfind-wrapper");
+    QCoreApplication::setApplicationVersion("1.0");
 
     QCommandLineParser parser;
-    parser.setApplicationDescription("Generic Cracker compatible with Hashtopolis");
+    parser.setApplicationDescription("MDXfind Wrapper for Hashtopolis - Hash Algorithm Identification and Cracking");
     parser.addHelpOption();
     parser.addVersionOption();
-    parser.addPositionalArgument("action", QCoreApplication::translate("main", "Action to execute (keyspace, benchmark or crack)"));
+    parser.addPositionalArgument("action", QCoreApplication::translate("main", "Action to execute (keyspace or crack)"));
 
     QCommandLineOption maskOption(QStringList() << "m" << "mask",
            QCoreApplication::translate("main", "Use mask for attack"),
@@ -48,10 +48,27 @@ int main(int argc, char *argv[]){
            QCoreApplication::translate("main", "seconds"));
     parser.addOption(timeoutOption);
 
+    QCommandLineOption hashTypeOption(QStringList() << "hash-type",
+           QCoreApplication::translate("main", "Hash types for MDXfind (e.g., 'ALL,!user,salt' or 'MD5,SHA1')"),
+           QCoreApplication::translate("main", "types"));
+    parser.addOption(hashTypeOption);
+
+    QCommandLineOption iterationsOption(QStringList() << "i" << "iterations",
+           QCoreApplication::translate("main", "Number of iterations for hash algorithms"),
+           QCoreApplication::translate("main", "count"));
+    parser.addOption(iterationsOption);
+
     // Process the actual command line arguments given by the user
-    parser.parse(a.arguments());
+    parser.process(a);
 
     const QStringList args = parser.positionalArguments();
+
+    // Check if help or version was requested
+    if(args.isEmpty()){
+        parser.showHelp();
+        return 0;
+    }
+
     QString action = args.at(0);
 
     //qDebug() << "Executing action: " + action;
@@ -75,6 +92,17 @@ int main(int argc, char *argv[]){
         long long int length = parser.value(lengthOption).toLong();
         int timeout = parser.value(timeoutOption).toInt();
         QString hashlist = parser.value(hashlistOption);
+        QString hashType = parser.value(hashTypeOption);
+        int iterations = parser.value(iterationsOption).toInt();
+
+        // Default values from your bash script
+        if(hashType.isEmpty()){
+            hashType = "ALL,!user,salt";
+        }
+        if(iterations == 0){
+            iterations = 10;
+        }
+
         int type = 0;
         QString attack = "";
         if(parser.value(maskOption).length() > 0){
@@ -85,7 +113,7 @@ int main(int argc, char *argv[]){
             type = 2;
             attack = parser.value(wordlistOption);
         }
-        thread = new RunThread(type, attack, hashlist, skip, length, timeout);
+        thread = new RunThread(type, attack, hashlist, skip, length, timeout, hashType, iterations);
     }
     else{
         cerr << "Invalid action!" << endl;
