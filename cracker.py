@@ -137,9 +137,12 @@ class CrackerApp:
                     )
 
                     # Setup timeout if specified
+                    timeout_occurred = False
                     if timeout:
                         import signal
                         def timeout_handler(signum, frame):
+                            nonlocal timeout_occurred
+                            timeout_occurred = True
                             process.terminate()
                         signal.signal(signal.SIGALRM, timeout_handler)
                         signal.alarm(int(timeout))
@@ -198,7 +201,9 @@ class CrackerApp:
                     process.wait()
 
                     # Output final STATUS
-                    progress_tracker.set_complete()
+                    # Only mark as complete if timeout didn't terminate the process
+                    if not timeout_occurred:
+                        progress_tracker.set_complete()
                     self._output_status(progress_tracker)
 
                     return 0
@@ -378,7 +383,11 @@ class ProgressTracker:
         self.complete = True
 
     def get_progress(self):
-        """Get progress as integer 0-10000 (0.00% to 100.00%)"""
+        """Get progress as integer 0-10000 (0.00% to 100.00%)
+
+        Uses MDXfind progress updates when available, falls back to time-based
+        estimation for benchmarks where MDXfind hasn't reported yet.
+        """
         if self.complete:
             return 10000
 
@@ -388,7 +397,21 @@ class ProgressTracker:
         # Calculate progress based on current line vs total
         processed = self.current_line - self.skip
         progress = int((processed / self.total_keyspace) * 10000)
-        return min(10000, max(0, progress))
+
+        # If we have MDXfind progress data, use it
+        if progress > 0:
+            return min(10000, progress)
+
+        # Fallback: If MDXfind hasn't reported progress yet but we have speed data,
+        # estimate progress based on elapsed time and speed
+        if self.speed > 0:
+            elapsed = time.time() - self.start_time
+            estimated_processed = int(self.speed * elapsed)
+            progress = int((estimated_processed / self.total_keyspace) * 10000)
+            return min(10000, max(0, progress))
+
+        # Last resort: No data yet, return 0
+        return 0
 
     def get_speed(self):
         """Get current speed in candidates/sec"""
@@ -428,7 +451,8 @@ def main():
                        type=int,
                        help='Stop cracking process after fixed amount of time (seconds)')
 
-    parser.add_argument('-t', '--type',
+    parser.add_argument('-t', '--type', '--hash-type',
+                       dest='type',
                        default='ALL,!user,salt',
                        help="Hash types for MDXfind (e.g., 'ALL,!user,salt' or 'MD5,SHA1')")
 
