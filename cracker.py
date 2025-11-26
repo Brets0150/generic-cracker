@@ -88,6 +88,20 @@ class CrackerApp:
             print("ERROR: No hashes found in hash list", file=sys.stderr)
             return 1
 
+        # Create temporary wordlist if length is specified
+        # This ensures MDXfind stops at the right point
+        temp_wordlist = None
+        if length:
+            temp_wordlist = self._create_chunk_wordlist(wordlist, skip, length)
+            if not temp_wordlist:
+                print("ERROR: Failed to create chunk wordlist", file=sys.stderr)
+                return 1
+            wordlist_to_use = temp_wordlist
+            mdx_skip = 0  # No need to skip in MDXfind since we pre-sliced the wordlist
+        else:
+            wordlist_to_use = wordlist
+            mdx_skip = skip
+
         # Create temporary files for hashes and salts
         with tempfile.NamedTemporaryFile(mode='w', suffix='.hashes', delete=False) as hash_file, \
              tempfile.NamedTemporaryFile(mode='w', suffix='.salts', delete=False) as salt_file:
@@ -115,12 +129,12 @@ class CrackerApp:
                     '-f', hash_filename,
                     '-s', salt_filename,
                     '-e',  # Extended search for truncated hashes
-                    wordlist
+                    wordlist_to_use
                 ]
 
                 # Add skip parameter if specified
-                if skip > 0:
-                    cmd.extend(['-w', str(skip)])
+                if mdx_skip > 0:
+                    cmd.extend(['-w', str(mdx_skip)])
 
                 # Prepare for progress tracking
                 progress_tracker = ProgressTracker(total_keyspace, skip)
@@ -201,7 +215,7 @@ class CrackerApp:
                     process.wait()
 
                     # Output final STATUS
-                    # Only mark as complete if timeout didn't terminate the process
+                    # Mark as complete if timeout didn't occur
                     if not timeout_occurred:
                         progress_tracker.set_complete()
                     self._output_status(progress_tracker)
@@ -217,8 +231,37 @@ class CrackerApp:
                 try:
                     os.unlink(hash_filename)
                     os.unlink(salt_filename)
+                    if temp_wordlist:
+                        os.unlink(temp_wordlist)
                 except:
                     pass
+
+    def _create_chunk_wordlist(self, wordlist, skip, length):
+        """Create a temporary wordlist containing only the specified chunk
+
+        This ensures MDXfind stops at the exact right point without needing
+        runtime termination logic.
+        """
+        try:
+            temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.wordlist', delete=False)
+            temp_filename = temp_file.name
+
+            with open(wordlist, 'r', encoding='utf-8', errors='ignore') as src:
+                # Skip lines
+                for _ in range(skip):
+                    next(src, None)
+
+                # Write length lines
+                for i, line in enumerate(src):
+                    if i >= length:
+                        break
+                    temp_file.write(line)
+
+            temp_file.close()
+            return temp_filename
+        except Exception as e:
+            print(f"ERROR: Failed to create chunk wordlist: {e}", file=sys.stderr)
+            return None
 
     def _count_wordlist_lines(self, wordlist):
         """Count total lines in wordlist"""
