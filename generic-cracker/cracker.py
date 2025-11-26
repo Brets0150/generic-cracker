@@ -67,8 +67,10 @@ class CrackerApp:
             return 1
 
     def crack(self, hashlist, wordlist, hash_type='ALL,!user,salt',
-              skip=0, limit=None, iterations=10, timeout=None, mdxfind_args=None):
+              skip=0, limit=None, iterations=10, timeout=None, mdxfind_args=None, debug=False):
         """Crack hashes using MDXfind with progress reporting"""
+
+        self.debug = debug
 
         if not hashlist or not Path(hashlist).exists():
             print("ERROR: Hash list file not found", file=sys.stderr)
@@ -203,6 +205,8 @@ class CrackerApp:
                         # Process stderr (progress info)
                         try:
                             line = stderr_queue.get(timeout=0.1)
+                            if self.debug:
+                                print(f"[DEBUG STDERR] {line}", file=sys.stderr, flush=True)
                             self._parse_progress_line(line, progress_tracker)
                         except Empty:
                             pass
@@ -210,6 +214,8 @@ class CrackerApp:
                         # Output STATUS line periodically
                         current_time = time.time()
                         if current_time - last_status_time >= status_interval:
+                            if self.debug:
+                                print(f"[DEBUG] Progress tracker: current_line={progress_tracker.current_line}, skip={progress_tracker.skip}, total={progress_tracker.total_keyspace}, speed={progress_tracker.speed}", file=sys.stderr, flush=True)
                             self._output_status(progress_tracker)
                             last_status_time = current_time
 
@@ -247,23 +253,26 @@ class CrackerApp:
 
         This ensures MDXfind stops at the exact right point without needing
         runtime termination logic.
+
+        Uses tail/head commands for efficient extraction of large chunks.
         """
         try:
             temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.wordlist', delete=False)
             temp_filename = temp_file.name
+            temp_file.close()  # Close immediately so shell can write to it
 
-            with open(wordlist, 'r', encoding='utf-8', errors='ignore') as src:
-                # Skip lines
-                for _ in range(skip):
-                    next(src, None)
+            # Use tail and head for efficient chunk extraction
+            # tail -n +N starts at line N (1-indexed)
+            # head -n M takes first M lines
+            start_line = skip + 1  # tail uses 1-indexed line numbers
 
-                # Write length lines
-                for i, line in enumerate(src):
-                    if i >= length:
-                        break
-                    temp_file.write(line)
+            cmd = f"tail -n +{start_line} \"{wordlist}\" | head -n {length} > \"{temp_filename}\""
 
-            temp_file.close()
+            result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+            if result.returncode != 0:
+                print(f"ERROR: Failed to create chunk wordlist: {result.stderr}", file=sys.stderr)
+                return None
+
             return temp_filename
         except Exception as e:
             print(f"ERROR: Failed to create chunk wordlist: {e}", file=sys.stderr)
@@ -511,6 +520,10 @@ def main():
                        default=10,
                        help='Number of iterations for hash algorithms')
 
+    parser.add_argument('--debug',
+                       action='store_true',
+                       help='Enable debug output showing MDXfind stderr and progress tracking')
+
     parser.add_argument('--version', action='version', version='%(prog)s 2.2 (Python)')
 
     # Parse known arguments, collect unknowns for MDXfind pass-through
@@ -542,7 +555,8 @@ def main():
             limit=args.limit,
             iterations=args.iterations,
             timeout=args.timeout,
-            mdxfind_args=mdxfind_passthrough
+            mdxfind_args=mdxfind_passthrough,
+            debug=args.debug
         )
 
     return 0
