@@ -90,19 +90,10 @@ class CrackerApp:
             print("ERROR: No hashes found in hash list", file=sys.stderr)
             return 1
 
-        # Create temporary wordlist if limit is specified
-        # This ensures MDXfind stops at the right point
-        temp_wordlist = None
-        if limit:
-            temp_wordlist = self._create_chunk_wordlist(wordlist, skip, limit)
-            if not temp_wordlist:
-                print("ERROR: Failed to create chunk wordlist", file=sys.stderr)
-                return 1
-            wordlist_to_use = temp_wordlist
-            mdx_skip = 0  # No need to skip in MDXfind since we pre-sliced the wordlist
-        else:
-            wordlist_to_use = wordlist
-            mdx_skip = skip
+        # Use MDXfind's -w parameter for skip, no chunking needed
+        # We'll monitor progress and terminate when limit is reached
+        wordlist_to_use = wordlist
+        mdx_skip = skip
 
         # Create temporary files for hashes and salts
         with tempfile.NamedTemporaryFile(mode='w', suffix='.hashes', delete=False) as hash_file, \
@@ -142,10 +133,10 @@ class CrackerApp:
                 cmd.append(wordlist_to_use)
 
                 # Prepare for progress tracking
-                # Note: When using temp wordlist (limit specified), MDXfind reports
-                # line numbers starting from 0, so we pass skip=0 to the tracker
-                tracker_skip = 0 if limit else skip
-                progress_tracker = ProgressTracker(total_keyspace, tracker_skip)
+                # MDXfind reports absolute line numbers in the wordlist file
+                # When skip is used, line numbers start from skip position
+                progress_tracker = ProgressTracker(total_keyspace, skip)
+                progress_tracker.limit = limit  # Store limit for termination check
                 cracked_hashes = []
 
                 try:
@@ -208,6 +199,14 @@ class CrackerApp:
                             if self.debug:
                                 print(f"[DEBUG STDERR] {line}", file=sys.stderr, flush=True)
                             self._parse_progress_line(line, progress_tracker)
+
+                            # Check if we've reached the limit
+                            if limit and progress_tracker.current_line >= (skip + limit):
+                                if self.debug:
+                                    print(f"[DEBUG] Limit reached: current_line={progress_tracker.current_line}, skip={skip}, limit={limit}", file=sys.stderr, flush=True)
+                                process.terminate()
+                                progress_tracker.set_complete()
+                                break
                         except Empty:
                             pass
 
@@ -243,40 +242,8 @@ class CrackerApp:
                 try:
                     os.unlink(hash_filename)
                     os.unlink(salt_filename)
-                    if temp_wordlist:
-                        os.unlink(temp_wordlist)
                 except:
                     pass
-
-    def _create_chunk_wordlist(self, wordlist, skip, length):
-        """Create a temporary wordlist containing only the specified chunk
-
-        This ensures MDXfind stops at the exact right point without needing
-        runtime termination logic.
-
-        Uses tail/head commands for efficient extraction of large chunks.
-        """
-        try:
-            temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.wordlist', delete=False)
-            temp_filename = temp_file.name
-            temp_file.close()  # Close immediately so shell can write to it
-
-            # Use tail and head for efficient chunk extraction
-            # tail -n +N starts at line N (1-indexed)
-            # head -n M takes first M lines
-            start_line = skip + 1  # tail uses 1-indexed line numbers
-
-            cmd = f"tail -n +{start_line} \"{wordlist}\" | head -n {length} > \"{temp_filename}\""
-
-            result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-            if result.returncode != 0:
-                print(f"ERROR: Failed to create chunk wordlist: {result.stderr}", file=sys.stderr)
-                return None
-
-            return temp_filename
-        except Exception as e:
-            print(f"ERROR: Failed to create chunk wordlist: {e}", file=sys.stderr)
-            return None
 
     def _count_wordlist_lines(self, wordlist):
         """Count total lines in wordlist"""
@@ -430,8 +397,12 @@ class ProgressTracker:
         self.last_update_time = self.start_time
 
     def update(self, current_line, speed, found_count):
-        """Update progress from MDXfind status line"""
-        self.current_line = current_line + self.skip
+        """Update progress from MDXfind status line
+
+        MDXfind reports absolute line numbers in the wordlist file,
+        so we don't need to add skip here.
+        """
+        self.current_line = current_line
         self.speed = speed
         self.cracked_count = found_count
         self.last_update_time = time.time()
