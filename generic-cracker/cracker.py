@@ -66,11 +66,11 @@ class CrackerApp:
             print(f"ERROR: Failed to read wordlist: {e}", file=sys.stderr)
             return 1
 
-    def crack(self, attacked_hashlist, wordlist, hash_type='ALL,!user,salt',
-              skip=0, length=None, iterations=10, timeout=None):
+    def crack(self, hashlist, wordlist, hash_type='ALL,!user,salt',
+              skip=0, limit=None, iterations=10, timeout=None, mdxfind_args=None):
         """Crack hashes using MDXfind with progress reporting"""
 
-        if not attacked_hashlist or not Path(attacked_hashlist).exists():
+        if not hashlist or not Path(hashlist).exists():
             print("ERROR: Hash list file not found", file=sys.stderr)
             return 1
 
@@ -79,20 +79,20 @@ class CrackerApp:
             return 1
 
         # Calculate total keyspace
-        total_keyspace = length if length else self._count_wordlist_lines(wordlist)
+        total_keyspace = limit if limit else self._count_wordlist_lines(wordlist)
 
-        # Parse hash file and separate hashes from salts
-        hashes, salts = self._parse_hashlist(attacked_hashlist)
+        # Parse hashlist file (tab-separated: hash<TAB>salt)
+        hashes, salts = self._parse_hashlist(hashlist)
 
         if not hashes:
             print("ERROR: No hashes found in hash list", file=sys.stderr)
             return 1
 
-        # Create temporary wordlist if length is specified
+        # Create temporary wordlist if limit is specified
         # This ensures MDXfind stops at the right point
         temp_wordlist = None
-        if length:
-            temp_wordlist = self._create_chunk_wordlist(wordlist, skip, length)
+        if limit:
+            temp_wordlist = self._create_chunk_wordlist(wordlist, skip, limit)
             if not temp_wordlist:
                 print("ERROR: Failed to create chunk wordlist", file=sys.stderr)
                 return 1
@@ -124,17 +124,20 @@ class CrackerApp:
                 cmd = [
                     str(self.mdxfind_path),
                     '-h', hash_type,
-                    '-i', str(iterations),
-                    '-q', str(iterations),
                     '-f', hash_filename,
                     '-s', salt_filename,
-                    '-e',  # Extended search for truncated hashes
-                    wordlist_to_use
                 ]
 
-                # Add skip parameter if specified
+                # Add skip parameter if specified (uses MDXfind's -w)
                 if mdx_skip > 0:
                     cmd.extend(['-w', str(mdx_skip)])
+
+                # Add any additional MDXfind pass-through arguments
+                if mdxfind_args:
+                    cmd.extend(mdxfind_args)
+
+                # Add wordlist at the end
+                cmd.append(wordlist_to_use)
 
                 # Prepare for progress tracking
                 progress_tracker = ProgressTracker(total_keyspace, skip)
@@ -323,19 +326,23 @@ class CrackerApp:
         print(f"STATUS {progress} {speed}", flush=True)
 
     def _parse_hashlist(self, hashlist_file):
-        """Parse hash list file and extract hashes and salts"""
+        """Parse Hashtopolis hash list file (tab-separated format)
+
+        Format: hash<TAB>salt
+        Each line contains a hash, followed by a tab, followed by an optional salt.
+        """
         hashes = []
         salts = []
 
         try:
             with open(hashlist_file, 'r', encoding='utf-8', errors='ignore') as f:
                 for line in f:
-                    line = line.strip()
+                    line = line.rstrip('\n\r')
                     if not line:
                         continue
 
-                    # Format: hash:salt:plaintext or hash:salt or hash
-                    parts = line.split(':')
+                    # Split on tab character
+                    parts = line.split('\t')
 
                     if len(parts) >= 1:
                         hashes.append(parts[0])
@@ -472,30 +479,27 @@ def main():
                        choices=['keyspace', 'crack'],
                        help='Action to execute (keyspace or crack)')
 
-    parser.add_argument('-m', '--mask',
-                       help='Use mask for attack')
+    # Cracker-specific arguments (not passed to MDXfind)
+    parser.add_argument('-a', '--hashlist',
+                       help='File containing list of hashes to attack (tab-separated: hash<TAB>salt)')
 
     parser.add_argument('-w', '--wordlist',
                        help='Use wordlist for attack')
 
-    parser.add_argument('-a', '--attacked-hashlist',
-                       help='File containing list of hashes to attack')
-
     parser.add_argument('-s', '--skip',
                        type=int,
                        default=0,
-                       help='Skip X first passwords in wordlist')
+                       help='Skip X first passwords in wordlist (for chunking)')
 
-    parser.add_argument('-l', '--length',
+    parser.add_argument('-l', '--limit',
                        type=int,
-                       help='Crack X first passwords in wordlist')
+                       help='Process X passwords from wordlist (for chunking)')
 
     parser.add_argument('--timeout',
                        type=int,
                        help='Stop cracking process after fixed amount of time (seconds)')
 
-    parser.add_argument('-t', '--type', '--hash-type',
-                       dest='type',
+    parser.add_argument('-t', '--hash-type',
                        default='ALL,!user,salt',
                        help="Hash types for MDXfind (e.g., 'ALL,!user,salt' or 'MD5,SHA1')")
 
@@ -504,10 +508,10 @@ def main():
                        default=10,
                        help='Number of iterations for hash algorithms')
 
-    parser.add_argument('--version', action='version', version='%(prog)s 2.1 (Python)')
+    parser.add_argument('--version', action='version', version='%(prog)s 2.2 (Python)')
 
-    # Parse arguments, but allow unknown options for Hashtopolis compatibility
-    args, unknown = parser.parse_known_args()
+    # Parse known arguments, collect unknowns for MDXfind pass-through
+    args, mdxfind_passthrough = parser.parse_known_args()
 
     # Create app instance
     app = CrackerApp()
@@ -520,21 +524,22 @@ def main():
         return app.keyspace(args.wordlist)
 
     elif args.action == 'crack':
-        if not args.attacked_hashlist:
-            print("ERROR: --attacked-hashlist is required for crack action", file=sys.stderr)
+        if not args.hashlist:
+            print("ERROR: --hashlist is required for crack action", file=sys.stderr)
             return 1
         if not args.wordlist:
             print("ERROR: --wordlist is required for crack action", file=sys.stderr)
             return 1
 
         return app.crack(
-            attacked_hashlist=args.attacked_hashlist,
+            hashlist=args.hashlist,
             wordlist=args.wordlist,
-            hash_type=args.type,
+            hash_type=args.hash_type,
             skip=args.skip,
-            length=args.length,
+            limit=args.limit,
             iterations=args.iterations,
-            timeout=args.timeout
+            timeout=args.timeout,
+            mdxfind_args=mdxfind_passthrough
         )
 
     return 0
