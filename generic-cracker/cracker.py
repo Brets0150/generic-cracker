@@ -428,20 +428,12 @@ class ProgressTracker:
             return 0
 
         # Calculate progress based on current line vs total
-        processed = self.current_line - self.skip
+        processed = self.current_line - self.skip 
         progress = int((processed / self.total_keyspace) * 10000)
-
+        
         # If we have MDXfind progress data, use it
         if progress > 0:
             return min(10000, progress)
-
-        # Fallback: If MDXfind hasn't reported progress yet but we have speed data,
-        # estimate progress based on elapsed time and speed
-        if self.speed > 0:
-            elapsed = time.time() - self.start_time
-            estimated_processed = int(self.speed * elapsed)
-            progress = int((estimated_processed / self.total_keyspace) * 10000)
-            return min(10000, max(0, progress))
 
         # Last resort: No data yet, return 0
         return 0
