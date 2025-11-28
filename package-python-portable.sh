@@ -1,6 +1,6 @@
 #!/bin/bash
 ################################################################################
-# Generic Cracker - Portable Python Package Script
+# MDX Agent - Portable Python Package Script
 # Creates a package that uses system Python (no PyInstaller, no GLIBC issues)
 ################################################################################
 
@@ -13,11 +13,11 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}Generic Cracker Portable Python Package${NC}"
+echo -e "${GREEN}MDX Agent Portable Python Package${NC}"
 echo -e "${GREEN}========================================${NC}"
 
 # Configuration
-PACKAGE_NAME="generic-cracker"
+PACKAGE_NAME="mdx-agent"
 BUILD_DIR="$(pwd)"
 PACKAGE_DIR="${BUILD_DIR}/${PACKAGE_NAME}"
 
@@ -49,7 +49,7 @@ echo -e "${GREEN}Creating launcher scripts...${NC}"
 # Main launcher (cracker)
 cat > "$PACKAGE_DIR/cracker" << 'EOF'
 #!/bin/bash
-# Generic Cracker Launcher - Uses system Python3
+# MDX Agent Launcher - Uses system Python3
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 exec python3 "$SCRIPT_DIR/cracker.py" "$@"
 EOF
@@ -58,7 +58,7 @@ chmod +x "$PACKAGE_DIR/cracker"
 # Binary-named launcher (cracker.bin) for compatibility
 cat > "$PACKAGE_DIR/cracker.bin" << 'EOF'
 #!/bin/bash
-# Generic Cracker Binary Launcher - Uses system Python3
+# MDX Agent Binary Launcher - Uses system Python3
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 exec python3 "$SCRIPT_DIR/cracker.py" "$@"
 EOF
@@ -77,148 +77,17 @@ fi
 echo -e "${GREEN}Copying documentation...${NC}"
 if [ -f "$BUILD_DIR/README.md" ]; then
     cp "$BUILD_DIR/README.md" "$PACKAGE_DIR/"
+else
+    echo -e "${YELLOW}Warning: README.md not found${NC}"
 fi
 if [ -f "$BUILD_DIR/LICENSE" ]; then
     cp "$BUILD_DIR/LICENSE" "$PACKAGE_DIR/"
 fi
 
-# Create deployment README
-echo -e "${GREEN}Creating deployment instructions...${NC}"
-cat > "$PACKAGE_DIR/DEPLOYMENT.md" << 'EOF'
-# Generic Cracker - Deployment Instructions (Portable Python)
-
-## Quick Start
-
-1. Extract the archive to your desired location
-2. Run the cracker:
-   ```bash
-   ./cracker crack -a hashlist.txt -w wordlist.txt -t MD5
-   ```
-
-## Directory Structure
-
-- `cracker` - Launcher script (uses system Python3)
-- `cracker.bin` - Alternative launcher (same as above)
-- `cracker.py` - Python source code
-- `mdx_bin/` - MDXfind binaries for different platforms
-
-## System Requirements
-
-**Required:**
-- Python 3.6 or newer (system installation)
-- Linux x86_64
-
-**That's it!** No special libraries, no PyInstaller, no GLIBC version issues.
-
-## Key Advantages
-
-✅ **No GLIBC issues** - Uses system Python, not bundled interpreter
-✅ **No GLIBCXX issues** - Pure Python, no C++ dependencies
-✅ **Minimal requirements** - Only needs Python3 (standard on all Linux)
-✅ **Tiny package** - <50KB (Python source + scripts)
-✅ **Maximum compatibility** - Works on any Linux with Python 3.6+
-✅ **Easy to audit** - Source code included, not compiled
-
-## Usage
-
-### Calculate Keyspace
-```bash
-./cracker keyspace -w wordlist.txt
-```
-
-### Crack Hashes
-```bash
-./cracker crack -a hashlist.txt -w wordlist.txt -t MD5 -s 0 -l 100
-```
-
-### Available Options
-
-- `-w, --wordlist <file>` - Wordlist for dictionary attack
-- `-a, --attacked-hashlist <file>` - File containing hashes to crack
-- `-t, --type <types>` - Hash types (e.g., 'MD5', 'ALL,!user,salt')
-- `-s, --skip <num>` - Skip first N passwords
-- `-l, --length <num>` - Process N passwords
-- `-i, --iterations <num>` - Iteration count for hash algorithms
-- `--timeout <seconds>` - Maximum runtime
-
-### Output Format
-
-Cracked hashes are output in the format:
-```
-hash:plaintext:algorithm
-```
-
-## Hashtopolis Integration
-
-This cracker is compatible with Hashtopolis. Configure the binary path:
-```
-/path/to/generic-cracker/cracker
-```
-
-Both `cracker` and `cracker.bin` launchers work identically.
-
-## Troubleshooting
-
-### "python3: command not found"
-
-Install Python 3:
-```bash
-# Ubuntu/Debian
-sudo apt-get install python3
-
-# CentOS/RHEL
-sudo yum install python3
-
-# Most systems already have Python3 installed
-```
-
-### "Permission denied"
-
-```bash
-chmod +x cracker cracker.bin
-./cracker --help
-```
-
-### "MDXfind not found"
-
-Ensure the `mdx_bin/` directory is in the same location as the launcher.
-
-## Compatibility
-
-✅ **Tested on:**
-- Ubuntu 14.04 - 24.04 (Python 3.4 - 3.12)
-- Debian 8 - 12 (Python 3.4 - 3.11)
-- CentOS 7 - 9 (Python 3.6 - 3.9)
-- RHEL 7 - 9
-- Any Linux with Python 3.6+
-
-✅ **No GLIBC version requirements** - Uses system Python
-✅ **No library bundling** - Everything from system
-✅ **No compilation needed** - Pure Python source
-
-## Comparison: Portable vs PyInstaller
-
-| Feature | Portable Python | PyInstaller |
-|---------|----------------|-------------|
-| Package Size | <50KB | 16MB |
-| GLIBC Issues | ✅ None | ❌ Requires 2.38+ |
-| Requirements | Python3 (standard) | None |
-| Portability | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
-| Auditability | ✅ Source visible | ❌ Compiled |
-
-## Notes
-
-- Source code is included and readable
-- Uses system Python3 interpreter
-- No bundled libraries or interpreters
-- Maximum compatibility across distributions
-- Works on systems from 2014+
-EOF
-
 # Create version info file
 echo -e "${GREEN}Creating version info...${NC}"
 cat > "$PACKAGE_DIR/VERSION" << EOF
-Generic Cracker v2.1 (Portable Python)
+MDX Agent v3.0 (Portable Python)
 MDXfind Wrapper for Hashtopolis
 Built: $(date)
 System: $(uname -s) $(uname -m)
@@ -287,3 +156,4 @@ echo -e "  2. Extract: ${YELLOW}7z x ${PACKAGE_NAME}.7z${NC}"
 echo -e "  3. Run: ${YELLOW}./${PACKAGE_NAME}/cracker crack -a hashes.txt -w wordlist.txt${NC}"
 echo ""
 echo -e "${GREEN}Note:${NC} Target system only needs Python 3.6+ (standard on all modern Linux)"
+echo -e "${GREEN}Documentation:${NC} See README.md in the package for full details"
