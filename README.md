@@ -20,9 +20,6 @@ MDX Agent provides a clean, standards-compliant interface to MDXfind's powerful 
 - **Hashtopolis Integration**: Native support for distributed cracking workflows
 - **Zero Dependencies**: Pure Python 3.6+ implementation with no external libraries
 - **Progress Reporting**: Real-time status updates via MDXfind stderr monitoring
-- **Signal Handling**: Graceful shutdown on SIGTERM/SIGINT from Hashtopolis agent
-- **Portable Packaging**: Uses system Python—no GLIBC version conflicts
-- **Cross-Platform**: Includes MDXfind binaries for Linux, Windows, macOS, ARM, and more
 
 ## System Requirements
 
@@ -32,7 +29,7 @@ MDX Agent provides a clean, standards-compliant interface to MDXfind's powerful 
 
 **That's it!** No special libraries, no PyInstaller, no GLIBC version issues.
 
-### Not Testing on Windows:
+### Not Tested on Windows:
 I haven’t tested or built this with Windows in mind. There’s likely a straightforward way to implement it in a Windows agent, but I haven’t prioritized that work since none of the systems in my environment run Windows. Given that this is for a hash cracking system, Windows isn’t typically the preferred platform.
 
 ### MDXFind Version:
@@ -47,14 +44,18 @@ The version of the MDXFind utilities included in this project is the latest avai
 
 To use MDX-Agent with Hashtopolis, use the `mdx-agent.7z` archive download URL directly from this project's and add it to Hashtopolis as a generic cracker. No additional setup is required.
 
-**URL:**https://github.com/Brets0150/mdx-agent/raw/refs/heads/master/mdx-agent.7z
+**URL:** https://github.com/Brets0150/mdx-agent/raw/refs/heads/master/mdx-agent.7z
 
 ![create_bin_version](./docs/create_bin_version.png)
 
-Then create a new task with the generic binary, which is the MDX-agent.
+### Then create a new task with the generic binary, which is the MDX-agent.
+
+**NOTE:** When using the `--hash-type` (or -t) option, be sure to enclose the regex expression in double quotes so MDXFIND can correctly identify the hash type. If the double quote is blocked by hashtopolish, you’ll need to update your server’s "Characters that are not allowed to be used in attack command inputs" configuration to allow it. This ensures the full string is passed to MDXFIND on the command line.
+
 ![new-task_mdx-agent](./docs/new-task_mdx-agent.png)
 
-You should see watch the magic happen!
+### Lets it run!
+
 ![task_running](./docs/task_running.png)
 ![crack_found](./docs/crack_found.png)
 
@@ -69,18 +70,6 @@ If you wish to modify the MDX-Agent source code:
    ```
 3. The script will generate a new `mdx-agent.7z` archive with your modifications
 
-**Manual Installation (for standalone use):**
-
-1. Extract the package to your desired location:
-   ```bash
-   7z x mdx-agent.7z
-   cd mdx-agent
-   ```
-
-2. Verify the installation:
-   ```bash
-   ./mdx-agent --help
-   ```
 
 ### Basic Usage
 
@@ -101,16 +90,6 @@ The examples below show command-line usage for standalone testing. When using MD
   -l 10000
 ```
 
-### Hashtopolis Configuration
-
-Configure MDX Agent as a mdx-agent binary in Hashtopolis:
-
-1. Upload the `mdx-agent` directory to your Hashtopolis agent
-2. Set the binary path: `/path/to/mdx-agent/mdx-agent`
-3. Configure as a generic mdx-agent with dictionary attack support
-
-Both `mdx-agent` and `mdx-agent.bin` launchers work identically for compatibility.
-
 ## Hashtopolis Integration Guide
 
 ### Critical Configuration Requirements
@@ -125,14 +104,6 @@ MDX Agent has compatibility issues with Hashtopolis Speed Benchmarks due to the 
 - **Set benchmark runtime to at least 45 seconds in Hashtopolis Server config.**
 - Minimum 30 seconds may work, but 45+ seconds ensures MDXfind has sufficient time to start reporting cracking speed
 - This allows Hashtopolis to properly calculate chunk sizes for agent distribution
-
-**Example Hashtopolis Task Configuration:**
-```
-Benchmark Type: Runtime Benchmark
-Benchmark Time: 45 seconds (or higher)
-```
-
-Without adequate benchmark time, Hashtopolis cannot accurately determine agent performance, leading to improper task chunking.
 
 #### 2. Task Termination Limitations
 
@@ -151,7 +122,7 @@ Due to limitations in the Hashtopolis Python agent's generic mdx-agent implement
 Configure small chunk sizes to minimize impact:
 
 ```
-Chunk Size: 5 minutes worth of candidates
+Chunk Size: 5 minutes(300 seconds) worth of candidates
 ```
 
 With 5-minute chunks, an agent will finish and stop within 5 minutes even if the task is terminated.
@@ -205,10 +176,10 @@ This "plaintext" includes algorithm metadata and is not the actual password alon
 
 ```bash
 # Step 1: Import unknown hashes
-# Hashtopolis: Create hash list "mystery_hashes"
+# Hashtopolis: Create hash list "mystery_hashes" hashtypeID "0".
 
 # Step 2: Run MDXfind via Hashtopolis
-# Task: MDX Agent, Runtime Benchmark, 45s
+# Task: MDX Agent
 # Result: Discover hashes are "SHA256" from output
 
 # Step 3: Parse MDXfind output
@@ -255,6 +226,8 @@ While this format requires additional processing, the speed gains from:
 - `SHA1,SHA256` - Multiple specific algorithms
 - `ALL,!user,salt` - All algorithms except those requiring username, include salted
 - `MD5,SHA*` - MD5 and all SHA variants
+
+See the MDXFind wiki/manual for a full list hash types.
 
 ### Output Format
 
@@ -436,7 +409,7 @@ Anyone who has worked with password cracking knows that hash lists are frequentl
 
 **Before MDX Agent:**
 
-1. Manually download hash list from Hashtopolis
+1. Manually download hash list from source.
 2. Run MDXfind on a separate system
 3. Babysit the terminal to monitor progress
 4. Wait for completion (no parallelization)
