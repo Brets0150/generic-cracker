@@ -6,6 +6,5 @@ cmake-build-release
 hashmob.net_2025-11-23.large.found
 .old*
 mdx-agent/
-mdx-agent.7z
 *.pyc
 __pycache__/
