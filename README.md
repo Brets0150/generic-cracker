@@ -45,7 +45,18 @@ The version of the MDXFind utilities included in this project is the latest avai
 
 **For Hashtopolis Users:**
 
-To use MDXFind-Agent with Hashtopolis, download the `mdx-agent.7z` archive directly from this project's releases and add it to Hashtopolis as a generic cracker. No additional setup is required.
+To use MDX-Agent with Hashtopolis, use the `mdx-agent.7z` archive download URL directly from this project's and add it to Hashtopolis as a generic cracker. No additional setup is required.
+
+**URL:**https://github.com/Brets0150/mdx-agent/raw/refs/heads/master/mdx-agent.7z
+
+![create_bin_version](./docs/create_bin_version.png)
+
+Then create a new task with the generic binary, which is the MDX-agent.
+![new-task_mdx-agent](./docs/new-task_mdx-agent.png)
+
+You should see watch the magic happen!
+![task_running](./docs/task_running.png)
+![crack_found](./docs/crack_found.png)
 
 **For Developers/Custom Builds:**
 
