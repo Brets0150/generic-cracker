@@ -107,7 +107,7 @@ class CrackerApp:
             return 1
 
     def crack(self, hashlist, wordlist, hash_type='ALL,!user,salt',
-              skip=0, limit=None, iterations=10, timeout=None, mdxfind_args=None, debug=False):
+              skip=0, limit=None, timeout=None, mdxfind_args=None, debug=False):
         """Crack hashes using MDXfind with progress reporting"""
 
         self.debug = debug
@@ -549,11 +549,6 @@ def main():
                        default='ALL,!user,salt',
                        help="Hash types for MDXfind (e.g., 'ALL,!user,salt' or 'MD5,SHA1')")
 
-    parser.add_argument('-i', '--iterations',
-                       type=int,
-                       default=10,
-                       help='Number of iterations for hash algorithms')
-
     parser.add_argument('--debug',
                        action='store_true',
                        help='Enable debug output showing MDXfind stderr and progress tracking')
@@ -587,7 +582,6 @@ def main():
             hash_type=args.hash_type,
             skip=args.skip,
             limit=args.limit,
-            iterations=args.iterations,
             timeout=args.timeout,
             mdxfind_args=mdxfind_passthrough,
             debug=args.debug

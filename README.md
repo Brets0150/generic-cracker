@@ -8,6 +8,7 @@ MDX Agent is a lightweight, portable Python wrapper for the MDXfind hash identif
 > - **Always use Runtime Benchmark (45+ seconds)**, NOT Speed Benchmark
 > - **Tasks cannot be killed** once started—configure small chunk sizes (≤5 minutes)
 > - **Output format includes metadata** in plaintext field—requires workflow adjustment
+> - Obviously, make it a **CPU-only task**.
 
 ## Overview
 
@@ -31,9 +32,33 @@ MDX Agent provides a clean, standards-compliant interface to MDXfind's powerful 
 
 **That's it!** No special libraries, no PyInstaller, no GLIBC version issues.
 
+### Not Testing on Windows:
+I haven’t tested or built this with Windows in mind. There’s likely a straightforward way to implement it in a Windows agent, but I haven’t prioritized that work since none of the systems in my environment run Windows. Given that this is for a hash cracking system, Windows isn’t typically the preferred platform.
+
+### MDXFind Version:
+The version of the MDXFind utilities included in this project is the latest available as of November 2025. I happened to be writing this tool at the same time the newest release was published, so this project uses the most up-to-date version as of that date.
+
+
 ## Quick Start
 
 ### Installation
+
+**For Hashtopolis Users:**
+
+To use MDXFind-Agent with Hashtopolis, download the `mdx-agent.7z` archive directly from this project's releases and add it to Hashtopolis as a generic cracker. No additional setup is required.
+
+**For Developers/Custom Builds:**
+
+If you wish to modify the MDX-Agent source code:
+
+1. Edit the `mdx-agent.py` file with your changes
+2. Run the packaging script to create a new archive:
+   ```bash
+   ./package-python-portable.sh
+   ```
+3. The script will generate a new `mdx-agent.7z` archive with your modifications
+
+**Manual Installation (for standalone use):**
 
 1. Extract the package to your desired location:
    ```bash
@@ -43,19 +68,21 @@ MDX Agent provides a clean, standards-compliant interface to MDXfind's powerful 
 
 2. Verify the installation:
    ```bash
-   ./cracker --help
+   ./mdx-agent --help
    ```
 
 ### Basic Usage
 
+The examples below show command-line usage for standalone testing. When using MDX Agent with Hashtopolis, the `keyspace` and `crack` keywords are automatically added by the Hashtopolis agent—you do not need to specify them manually in your task configuration.
+
 **Calculate wordlist keyspace:**
 ```bash
-./cracker keyspace -w /path/to/wordlist.txt
+./mdx-agent keyspace -w /path/to/wordlist.txt
 ```
 
 **Crack hashes:**
 ```bash
-./cracker crack \
+./mdx-agent crack \
   -a hashlist.txt \
   -w wordlist.txt \
   -t "ALL,!user,salt" \
@@ -65,13 +92,13 @@ MDX Agent provides a clean, standards-compliant interface to MDXfind's powerful 
 
 ### Hashtopolis Configuration
 
-Configure MDX Agent as a cracker binary in Hashtopolis:
+Configure MDX Agent as a mdx-agent binary in Hashtopolis:
 
 1. Upload the `mdx-agent` directory to your Hashtopolis agent
-2. Set the binary path: `/path/to/mdx-agent/cracker`
-3. Configure as a generic cracker with dictionary attack support
+2. Set the binary path: `/path/to/mdx-agent/mdx-agent`
+3. Configure as a generic mdx-agent with dictionary attack support
 
-Both `cracker` and `cracker.bin` launchers work identically for compatibility.
+Both `mdx-agent` and `mdx-agent.bin` launchers work identically for compatibility.
 
 ## Hashtopolis Integration Guide
 
@@ -84,7 +111,7 @@ Both `cracker` and `cracker.bin` launchers work identically for compatibility.
 MDX Agent has compatibility issues with Hashtopolis Speed Benchmarks due to the way cracking speed is reported. To avoid benchmark failures:
 
 - **Use Runtime Benchmark only** when creating Hashtopolis tasks
-- **Set benchmark runtime to at least 45 seconds** (60+ seconds recommended)
+- **Set benchmark runtime to at least 45 seconds in Hashtopolis Server config.**
 - Minimum 30 seconds may work, but 45+ seconds ensures MDXfind has sufficient time to start reporting cracking speed
 - This allows Hashtopolis to properly calculate chunk sizes for agent distribution
 
@@ -100,7 +127,7 @@ Without adequate benchmark time, Hashtopolis cannot accurately determine agent p
 
 **⚠️ WARNING: Tasks Cannot Be Killed Once Started**
 
-Due to limitations in the Hashtopolis Python agent's generic cracker implementation (specifically, lack of error handling on line 116 of the agent code), MDX Agent tasks **cannot be terminated** once running. The Hashtopolis agent does not send termination signals to the cracker binary.
+Due to limitations in the Hashtopolis Python agent's generic mdx-agent implementation ([specifically, lack of error handling on line 116 of the agent code](https://github.com/hashtopolis/agent-python/blob/master/htpclient/generic_cracker.py#L116)), MDX Agent tasks **cannot be terminated** once running. The Hashtopolis agent does not send termination signals to the mdx-agent binary.
 
 **Implications:**
 
@@ -192,55 +219,6 @@ While this format requires additional processing, the speed gains from:
 
 ...far outweigh the workflow adjustment needed.
 
-### Why This Project Exists
-
-#### The Hash Misidentification Problem
-
-Anyone who has worked with password cracking knows that hash lists are frequently misidentified. You receive a file labeled "MD5 hashes" that turns out to contain SHA1, NTLM, bcrypt, or any number of different algorithms mixed together.
-
-**Before MDX Agent:**
-
-1. Manually download hash list from Hashtopolis
-2. Run MDXfind on a separate system
-3. Babysit the terminal to monitor progress
-4. Wait for completion (no parallelization)
-5. Manually parse results
-6. Re-upload to Hashtopolis with correct algorithm
-
-This process was **time-consuming, manual, and single-threaded**.
-
-**With MDX Agent:**
-
-1. Create Hashtopolis task with MDX Agent
-2. Distribute across multiple agents automatically
-3. Monitor via Hashtopolis web interface
-4. Results stream back in real-time
-5. Parse algorithm from output
-6. Re-import with correct type
-
-This integration provides **massive speed improvements** through distributed processing and automation.
-
-#### Why Python? Why Not C++?
-
-This project was originally developed in C using the Hashtopolis generic cracker framework. However, persistent dependency issues forced a migration to Python:
-
-**C++ Version Problems:**
-
-- **Qt5 Dependency Hell**: Generic cracker requires Qt5 libraries
-- **Library Compatibility**: Works on Ubuntu 20.04, fails on newer distributions
-- **Missing Libraries**: Constant issues with missing .so files on modern systems
-- **Fleet Management**: Most production systems run newer OS versions
-
-**Python Version Advantages:**
-
-- **Zero Dependencies**: Pure Python 3 standard library
-- **System Python**: No library bundling or version conflicts
-- **Easy Development**: AI-assisted C-to-Python conversion
-- **Portability**: Runs on any Linux with Python 3.6+
-- **Maintainability**: Simpler codebase, easier debugging
-
-The Python rewrite eliminated all deployment issues while maintaining full functionality.
-
 ## Command Reference
 
 ### Actions
@@ -252,12 +230,11 @@ The Python rewrite eliminated all deployment issues while maintaining full funct
 
 | Argument | Description |
 |----------|-------------|
-| `-a`, `--hashlist <file>` | File containing hashes to crack (tab-separated: `hash<TAB>salt`) |
-| `-w`, `--wordlist <file>` | Wordlist for dictionary attack |
-| `-t`, `--hash-type <types>` | Hash types for MDXfind (default: `ALL,!user,salt`) |
+| `-a`, `--hashlist <file>` | Required: File containing hashes to crack (tab-separated: `hash<TAB>salt`) |
+| `-w`, `--wordlist <file>` | Required: Wordlist for dictionary attack |
+| `-t`, `--hash-type <types>` | Required: Hash types for MDXfind (default: `ALL,!user,salt`) |
 | `-s`, `--skip <num>` | Skip first N passwords in wordlist (for chunking) |
 | `-l`, `--limit <num>` | Process only N passwords from wordlist (for chunking) |
-| `-i`, `--iterations <num>` | Iteration count for hash algorithms (default: 10) |
 | `--timeout <seconds>` | Maximum runtime before termination |
 | `--debug` | Enable debug output showing MDXfind stderr and progress tracking |
 
@@ -284,32 +261,19 @@ Where `progress` is 0-10000 (representing 0.00% to 100.00%) and `speed` is in ha
 
 ## Architecture
 
-### Directory Structure
-
-```
-mdx-agent/
-├── cracker           # Main launcher script (uses system Python3)
-├── cracker.bin       # Alternative launcher (compatibility)
-├── cracker.py        # Python source code
-├── mdx_bin/          # MDXfind binaries for different platforms
-│   ├── mdxfind       # Linux x86_64
-│   ├── mdxfind.exe   # Windows x64
-│   ├── mdxfind.mac   # macOS Intel
-│   ├── mdxfind.macm1 # macOS Apple Silicon
-│   ├── mdxfind.arm8  # ARM64/AArch64
-│   └── ...           # Additional platform binaries
-├── README.md         # This file
-├── LICENSE           # MIT License
-└── VERSION           # Build information
-```
-
 ### Signal Handling
 
-MDX Agent properly handles termination signals from Hashtopolis:
+MDX Agent includes proper signal handling capabilities for graceful termination:
 
 - **SIGTERM/SIGINT**: Gracefully terminates MDXfind subprocess and exits cleanly
 - **Parent Process Death**: Detects orphaned state and shuts down
 - **Progress Preservation**: Final STATUS report before shutdown
+
+**Important Note on Hashtopolis Integration:**
+
+While MDX Agent is fully capable of receiving and handling termination signals from Hashtopolis, this functionality is currently not leveraged by the Hashtopolis Python agent. Specifically, the `generic_cracker.py` file in the Hashtopolis agent does not implement error handling or child process termination signals.
+
+If the Hashtopolis agent is updated in the future to include proper error handling and child process termination capabilities, MDX Agent is already prepared to receive and respond to these signals. This signal handling code exists within MDX Agent but remains unused by the current Hashtopolis agent implementation.
 
 ### Progress Tracking
 
@@ -327,7 +291,7 @@ The agent parses:
 
 Progress updates are sent to stdout every 5 seconds.
 
-## Hash List Format
+### Hash List Format
 
 MDX Agent expects tab-separated hash files compatible with Hashtopolis:
 
@@ -340,34 +304,49 @@ hash3<TAB>
 - First column: Hash value (required)
 - Second column: Salt value (optional, empty if unsalted)
 
+**Hashtopolis Integration:**
+
+When using MDX Agent with Hashtopolis, the hash list formatting is handled automatically by Hashtopolis' Hashlist Management API. You do not need to manually separate hashes and salts—simply provide your hash list to Hashtopolis.
+
+MDX Agent will automatically:
+- Detect whether the hash list contains salted or unsalted hashes
+- Create the appropriate file format for MDXfind
+- Generate the correct command-line arguments
+
+This tab-separated format requirement is directly correlated to Hashtopolis' Hashlist Management API structure. Whether your original hash list contains salted or unsalted hashes, MDX Agent processes them correctly without manual intervention.
+
 ## Advanced Usage
 
 ### Chunked Processing
 
-For distributed cracking, use skip/limit to process wordlist chunks:
+For distributed cracking, use skip/limit to process wordlist chunks. Hashtopolis will handle all of this for you and add in these command line options automatically.
 
 ```bash
 # Process chunk 1: lines 0-10000
-./cracker crack -a hashes.txt -w wordlist.txt -s 0 -l 10000
+./mdx-agent crack -a hashes.txt -w wordlist.txt -s 0 -l 10000
 
 # Process chunk 2: lines 10000-20000
-./cracker crack -a hashes.txt -w wordlist.txt -s 10000 -l 10000
+./mdx-agent crack -a hashes.txt -w wordlist.txt -s 10000 -l 10000
 ```
 
 ### MDXfind Pass-Through Arguments
 
-Unknown arguments are passed directly to MDXfind:
+Any command-line arguments that MDX Agent does not recognize are automatically passed through to MDXfind for processing. This allows you to leverage MDXfind's full feature set without requiring MDX Agent to explicitly support every MDXfind option.
+
+If an argument is not defined in MDX Agent's command-line interface, it will be forwarded directly to the MDXfind command that is launched:
 
 ```bash
-./cracker crack -a hashes.txt -w wordlist.txt -t MD5 --custom-mdxfind-arg
+./mdx-agent crack -a hashes.txt -w wordlist.txt -t "MD5,!salt,!users" -i 10 -q 10
 ```
+
+In this example, `-i 10 -q 10` would be passed directly to MDXfind since MDX Agent does not have a handler for it.
 
 ### Timeout-Based Tasks
 
 Limit execution time for benchmarking or time-based tasks:
 
 ```bash
-./cracker crack -a hashes.txt -w wordlist.txt --timeout 3600
+./mdx-agent crack -a hashes.txt -w wordlist.txt --timeout 3600
 ```
 
 ## Troubleshooting
@@ -394,8 +373,8 @@ Most modern Linux distributions include Python 3 by default.
 Ensure launcher scripts have execute permissions:
 
 ```bash
-chmod +x cracker cracker.bin
-./cracker --help
+chmod +x mdx-agent mdx-agent.bin
+./mdx-agent --help
 ```
 
 ### "MDXfind not found"
@@ -417,32 +396,11 @@ chmod +x mdx_bin/mdxfind
 Enable debug output to troubleshoot MDXfind execution:
 
 ```bash
-./cracker crack -a hashes.txt -w wordlist.txt --debug
+./mdx-agent crack -a hashes.txt -w wordlist.txt --debug
 ```
 
 This shows MDXfind's stderr output and progress tracking details.
 
-## Compatibility
-
-### Tested Platforms
-
-- **Ubuntu**: 14.04 - 24.04 (Python 3.4 - 3.12)
-- **Debian**: 8 - 12 (Python 3.4 - 3.11)
-- **CentOS**: 7 - 9 (Python 3.6 - 3.9)
-- **RHEL**: 7 - 9
-- **Fedora**: Recent releases
-- **Any Linux**: Python 3.6+ and appropriate MDXfind binary
-
-### Advantages vs. Compiled Distributions
-
-| Feature | MDX Agent (Portable) | PyInstaller Bundle |
-|---------|---------------------|-------------------|
-| Package Size | <50KB + binaries | 16MB+ |
-| GLIBC Requirements | ✅ None (uses system) | ❌ Specific version required |
-| Python Requirements | System Python 3.6+ | None (bundled) |
-| Portability | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
-| Auditability | ✅ Source visible | ❌ Compiled binary |
-| Compatibility | 2014+ systems | 2020+ systems |
 
 ## Development
 
@@ -458,62 +416,57 @@ This generates:
 - `mdx-agent/` directory with all required files
 - `mdx-agent.7z` compressed archive
 
-### Project Structure
 
-```
-generic-cracker/          # Project root (will be renamed)
-├── cracker.py            # Main Python script
-├── package-python-portable.sh  # Package builder
-├── mdx_bin/              # MDXfind binaries
-├── README.md             # This file
-├── LICENSE               # MIT License
-└── requirements.txt      # Python dependencies (none!)
-```
+## Why This Project Exists
 
-## License
+### The Hash Misidentification Problem
 
-MDX Agent is released under the MIT License. See [LICENSE](LICENSE) for details.
+Anyone who has worked with password cracking knows that hash lists are frequently misidentified. You receive a file labeled "MD5 hashes" that turns out to contain SHA1, NTLM, LM, or any number of different algorithms mixed together.
 
-MDXfind binaries are included from the official MDXfind distribution and are subject to their respective licenses.
+**Before MDX Agent:**
 
-## Credits
+1. Manually download hash list from Hashtopolis
+2. Run MDXfind on a separate system
+3. Babysit the terminal to monitor progress
+4. Wait for completion (no parallelization)
+5. Manually parse results
+6. Re-upload to Hashtopolis with correct algorithm
+
+This process was **time-consuming, manual, and single-threaded**.
+
+**With MDX Agent:**
+
+1. Create Hashtopolis task with MDX Agent
+2. Distribute across multiple agents automatically
+3. Monitor via Hashtopolis web interface
+4. Results stream back in real-time
+5. Parse algorithm from output
+6. Re-import with correct type
+
+This integration provides **massive speed improvements** through distributed processing and automation.
+
+### Why Python? Why Not C++?
+
+This project was originally developed in C using the Hashtopolis generic cracker code and framework. However, persistent dependency issues forced a migration to Python:
+
+**C++ Version Problems:**
+
+- **Qt5 Dependency Hell**: Generic mdx-agent requires Qt5 libraries
+- **Library Compatibility**: Works on Ubuntu 20.04, fails on newer distributions
+- **Missing Libraries**: Constant issues with missing .so files on modern systems
+- **Fleet Management**: Most production systems run newer OS versions
+
+**Python Version Advantages:**
+
+- **Zero Dependencies**: Pure Python 3 standard library
+- **System Python**: No library bundling or version conflicts
+- **Easy Development**: AI-assisted C-to-Python conversion
+- **Portability**: Runs on any Linux with Python 3.6+
+- **Maintainability**: Simpler codebase, easier debugging
+
+The Python rewrite eliminated all deployment issues while maintaining full functionality.
+
+# Credits
 
 - **MDXfind**: The powerful hash identification and cracking engine
 - **Hashtopolis**: Distributed hash cracking infrastructure
-- **MDX Agent**: Python wrapper and Hashtopolis integration
-
-## Version History
-
-### v3.0 (Current)
-- Renamed from "Generic Cracker" to "MDX Agent"
-- Streamlined documentation (single README.md)
-- Removed DEPLOYMENT.md generation
-- Updated package naming and branding
-
-### v2.1
-- Portable Python implementation
-- Eliminated PyInstaller dependencies
-- Enhanced signal handling for Hashtopolis
-- Parent process death detection
-
-### v2.0
-- Python rewrite from C++ version
-- Zero C++ library dependencies
-- MDXfind stderr progress parsing
-
-### v1.x
-- Original C++ implementation
-
-## Support
-
-For issues, questions, or contributions:
-
-1. Check the [Troubleshooting](#troubleshooting) section
-2. Review MDXfind documentation in `docs/`
-3. Report bugs with full debug output (`--debug` flag)
-
-## See Also
-
-- **MDXfind**: Official hash identification tool
-- **Hashtopolis**: Distributed hash cracking platform
-- **Python 3 Documentation**: https://docs.python.org/3/

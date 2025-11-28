@@ -22,8 +22,8 @@ BUILD_DIR="$(pwd)"
 PACKAGE_DIR="${BUILD_DIR}/${PACKAGE_NAME}"
 
 # Check if Python script exists
-if [ ! -f "cracker.py" ]; then
-    echo -e "${RED}Error: cracker.py not found${NC}"
+if [ ! -f "mdx-agent.py" ]; then
+    echo -e "${RED}Error: mdx-agent.py not found${NC}"
     exit 1
 fi
 
@@ -40,29 +40,29 @@ mkdir -p "$PACKAGE_DIR/mdx_bin"
 
 # Copy Python script
 echo -e "${GREEN}Copying Python script...${NC}"
-cp cracker.py "$PACKAGE_DIR/cracker.py"
-chmod +x "$PACKAGE_DIR/cracker.py"
+cp mdx-agent.py "$PACKAGE_DIR/mdx-agent.py"
+chmod +x "$PACKAGE_DIR/mdx-agent.py"
 
 # Create wrapper script that uses system Python
 echo -e "${GREEN}Creating launcher scripts...${NC}"
 
-# Main launcher (cracker)
-cat > "$PACKAGE_DIR/cracker" << 'EOF'
+# Main launcher (mdx-agent)
+cat > "$PACKAGE_DIR/mdx-agent" << 'EOF'
 #!/bin/bash
 # MDX Agent Launcher - Uses system Python3
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-exec python3 "$SCRIPT_DIR/cracker.py" "$@"
+exec python3 "$SCRIPT_DIR/mdx-agent.py" "$@"
 EOF
-chmod +x "$PACKAGE_DIR/cracker"
+chmod +x "$PACKAGE_DIR/mdx-agent"
 
-# Binary-named launcher (cracker.bin) for compatibility
-cat > "$PACKAGE_DIR/cracker.bin" << 'EOF'
+# Binary-named launcher (mdx-agent.bin) for compatibility
+cat > "$PACKAGE_DIR/mdx-agent.bin" << 'EOF'
 #!/bin/bash
 # MDX Agent Binary Launcher - Uses system Python3
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-exec python3 "$SCRIPT_DIR/cracker.py" "$@"
+exec python3 "$SCRIPT_DIR/mdx-agent.py" "$@"
 EOF
-chmod +x "$PACKAGE_DIR/cracker.bin"
+chmod +x "$PACKAGE_DIR/mdx-agent.bin"
 
 # Copy MDXfind binaries
 echo -e "${GREEN}Copying MDXfind binaries...${NC}"
@@ -147,13 +147,13 @@ echo -e "  • Maximum compatibility (2014+ systems)"
 echo ""
 echo -e "To test the package:"
 echo -e "  ${YELLOW}cd ${PACKAGE_DIR}${NC}"
-echo -e "  ${YELLOW}./cracker --help${NC}"
-echo -e "  ${YELLOW}./cracker keyspace -w /path/to/wordlist.txt${NC}"
+echo -e "  ${YELLOW}./mdx-agent --help${NC}"
+echo -e "  ${YELLOW}./mdx-agent keyspace -w /path/to/wordlist.txt${NC}"
 echo ""
 echo -e "To deploy:"
 echo -e "  1. Copy ${GREEN}${PACKAGE_NAME}.7z${NC} to target system"
 echo -e "  2. Extract: ${YELLOW}7z x ${PACKAGE_NAME}.7z${NC}"
-echo -e "  3. Run: ${YELLOW}./${PACKAGE_NAME}/cracker crack -a hashes.txt -w wordlist.txt${NC}"
+echo -e "  3. Run: ${YELLOW}./${PACKAGE_NAME}/mdx-agent crack -a hashes.txt -w wordlist.txt${NC}"
 echo ""
 echo -e "${GREEN}Note:${NC} Target system only needs Python 3.6+ (standard on all modern Linux)"
 echo -e "${GREEN}Documentation:${NC} See README.md in the package for full details"
